@@ -4,13 +4,33 @@ import (
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/rand"
+	"crypto/sha256"
 	"encoding/base64"
 	"fmt"
 	"io"
 )
 
+// padKey takes a key of any length and returns a valid AES key (16, 24, or 32 bytes)
+// by hashing the input key with SHA-256 and then truncating to the nearest valid length
+func padKey(key []byte) []byte {
+	hasher := sha256.New()
+	hasher.Write(key)
+	hash := hasher.Sum(nil)
+
+	// Use the first 16, 24, or 32 bytes of the hash
+	// This ensures we always use a strong key of valid length
+	keyLen := len(key)
+	if keyLen <= 16 {
+		return hash[:16] // AES-128
+	} else if keyLen <= 24 {
+		return hash[:24] // AES-192
+	}
+	return hash[:32] // AES-256
+}
+
 func Encrypt(key, value []byte) (string, error) {
-	block, err := aes.NewCipher(key)
+	paddedKey := padKey(key)
+	block, err := aes.NewCipher(paddedKey)
 	if err != nil {
 		return "", err
 	}
@@ -33,7 +53,8 @@ func Decrypt(key []byte, value string) (string, error) {
 		return "", err
 	}
 
-	block, err := aes.NewCipher(key)
+	paddedKey := padKey(key)
+	block, err := aes.NewCipher(paddedKey)
 	if err != nil {
 		return "", err
 	}
